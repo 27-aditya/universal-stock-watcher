@@ -1,0 +1,18 @@
+[
+  {
+    "id": "amul_whey_1kg",
+    "store": "amul",
+    "name": "Amul Whey Protein 1kg Chocolate",
+    "url": "https://amulfranchise.com/product/amul-whey-protein-1kg-chocolate",
+    "description": "1kg chocolate flavour whey protein by Amul",
+    "render": "http"
+  },
+  {
+    "id": "hotwheels_5pack_blinkit",
+    "store": "blinkit",
+    "name": "Hot Wheels 5-Car Gift Pack",
+    "url": "https://blinkit.com/prn/hot-wheels-5-car-gift-pack/prid/123456",
+    "description": "Hot Wheels 5-pack of die-cast toy cars, gift set",
+    "render": "browser"
+  }
+]

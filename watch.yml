@@ -1,0 +1,51 @@
+name: Stock Watcher
+
+on:
+  schedule:
+    - cron: '*/5 * * * *'   # every 5 minutes (GitHub may delay this under load)
+  workflow_dispatch: {}      # lets you trigger a run manually from the Actions tab
+
+permissions:
+  contents: write
+
+jobs:
+  check:
+    # ubuntu-latest = GitHub's hosted runner. It can NOT reach a self-hosted
+    # Ollama server on your own machine/LAN. If LLM_PROVIDER is "ollama" and
+    # OLLAMA_BASE_URL points to a local/private address, change this to
+    # "self-hosted" and set up a runner on the same network as Ollama -
+    # see README.md.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Install Playwright browser
+        run: playwright install --with-deps chromium
+
+      - name: Run watcher
+        run: python watcher.py
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          # LLM provider - "anthropic" (default) or "ollama". Set as repo
+          # Settings -> Secrets and variables -> Actions -> Variables tab.
+          LLM_PROVIDER: ${{ vars.LLM_PROVIDER || 'anthropic' }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          OLLAMA_BASE_URL: ${{ vars.OLLAMA_BASE_URL || 'http://localhost:11434' }}
+          OLLAMA_MODEL: ${{ vars.OLLAMA_MODEL || 'llama3.1' }}
+          LLM_CONCURRENCY: ${{ vars.LLM_CONCURRENCY || '5' }}
+
+      - name: Commit updated state
+        run: |
+          git config user.name "stock-watcher-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add state.json
+          git diff --quiet --cached || git commit -m "update state [skip ci]"
+          git push
