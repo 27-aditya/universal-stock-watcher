@@ -1,11 +1,11 @@
 [
   {
-    "id": "amul_whey_1kg",
+    "id": "amul_whey_protein",
     "store": "amul",
-    "name": "Amul Whey Protein 1kg Chocolate",
-    "url": "https://amulfranchise.com/product/amul-whey-protein-1kg-chocolate",
-    "description": "1kg chocolate flavour whey protein by Amul",
-    "render": "http"
+    "name": "Amul Whey Protein 1kg Chocolate (Pack of 30)",
+    "url": "https://shop.amul.com/en/product/amul-chocolate-whey-protein-34-g-or-pack-of-30-sachets",
+    "description": "Pack of 30 sachets (1.02 kg) of Amul lactose-free chocolate whey protein, 25g protein per sachet",
+    "render": "browser"
   },
   {
     "id": "hotwheels_5pack_blinkit",

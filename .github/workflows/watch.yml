@@ -8,6 +8,12 @@ on:
 permissions:
   contents: write
 
+# Never let two runs overlap - a run that slips past the schedule would
+# otherwise race with the state.json push from the previous one.
+concurrency:
+  group: stock-watcher
+  cancel-in-progress: false
+
 jobs:
   check:
     # ubuntu-latest = GitHub's hosted runner. It can NOT reach a self-hosted
@@ -16,17 +22,30 @@ jobs:
     # "self-hosted" and set up a runner on the same network as Ollama -
     # see README.md.
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
+          cache: 'pip'
 
       - name: Install dependencies
         run: pip install -r requirements.txt
 
+      - name: Check whether any product needs a browser
+        id: browser
+        run: |
+          needed=false
+          if python -c "import json,sys; sys.exit(0 if any(p.get('render')=='browser' for p in json.load(open('products.json'))) else 1)" 2>/dev/null; then
+            needed=true
+          fi
+          echo "needed=$needed" >> "$GITHUB_OUTPUT"
+          echo "browser rendering needed: $needed"
+
       - name: Install Playwright browser
+        if: steps.browser.outputs.needed == 'true'
         run: playwright install --with-deps chromium
 
       - name: Run watcher
@@ -40,12 +59,30 @@ jobs:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           OLLAMA_BASE_URL: ${{ vars.OLLAMA_BASE_URL || 'http://localhost:11434' }}
           OLLAMA_MODEL: ${{ vars.OLLAMA_MODEL || 'llama3.1' }}
+          ANTHROPIC_MODEL: ${{ vars.ANTHROPIC_MODEL || 'claude-haiku-4-5-20251001' }}
           LLM_CONCURRENCY: ${{ vars.LLM_CONCURRENCY || '5' }}
+          LLM_MIN_CONFIDENCE: ${{ vars.LLM_MIN_CONFIDENCE || '0.5' }}
+          NOTIFY_COOLDOWN_SECONDS: ${{ vars.NOTIFY_COOLDOWN_SECONDS || '1800' }}
+          ALERT_AFTER_FAILURES: ${{ vars.ALERT_AFTER_FAILURES || '3' }}
+          FETCH_RETRIES: ${{ vars.FETCH_RETRIES || '3' }}
+          REVALIDATE_EVERY: ${{ vars.REVALIDATE_EVERY || '20' }}
 
+      # Runs even if the watcher exited non-zero: a partial run still
+      # produced state worth keeping, and failing here would hide the
+      # watcher's own output behind a red state-commit step.
       - name: Commit updated state
+        if: always()
         run: |
+          if [ ! -f state.json ]; then
+            echo "no state.json produced, nothing to commit"
+            exit 0
+          fi
           git config user.name "stock-watcher-bot"
           git config user.email "actions@users.noreply.github.com"
           git add state.json
-          git diff --quiet --cached || git commit -m "update state [skip ci]"
-          git push
+          if git diff --cached --quiet; then
+            echo "state unchanged"
+          else
+            git commit -m "update state [skip ci]"
+            git push
+          fi

@@ -1,0 +1,14 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+
+# Test/build artifacts
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+_e2e_tmp/
+
+# Local runtime (state.json is intentionally committed at CI time)
+*.local.json
