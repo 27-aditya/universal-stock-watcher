@@ -75,6 +75,15 @@ def test_save_json_roundtrip(tmp_path):
     assert watcher.load_json(path, None) == {"b": 1, "a": [1, 2]}
 
 
+def test_save_json_is_atomic_and_leaves_no_temp_files(tmp_path):
+    path = tmp_path / "state.json"
+    watcher.save_json(path, {"a": 1})
+    watcher.save_json(path, {"a": 2})
+    assert watcher.load_json(path, None) == {"a": 2}
+    # no temporary files linger next to the target
+    assert sorted(p.name for p in tmp_path.iterdir()) == ["state.json"]
+
+
 # --------------------------------------------------------------------------
 # load_products
 # --------------------------------------------------------------------------

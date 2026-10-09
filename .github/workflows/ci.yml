@@ -1,0 +1,40 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Tests / ruff / e2e (py ${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ['3.11', '3.12', '3.13']
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt -r requirements-dev.txt
+
+      # The full gate: tests, the 90% coverage floor, and lint.
+      # The suite is offline (mocked/fake HTTP) and deterministic.
+      - name: Unit + integration tests (90% coverage gate)
+        run: python -m pytest -q
+
+      - name: Lint
+        run: python -m ruff check .
+
+      # Real HTTP server + real CLI, still fully offline.
+      - name: End-to-end
+        run: python e2e_local.py

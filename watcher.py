@@ -341,7 +341,15 @@ def load_json(path: Path, default: Any) -> Any:
 
 
 def save_json(path: Path, data: Any) -> None:
-    path.write_text(json.dumps(data, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    """Write state atomically: a crash mid-write can never corrupt the file.
+
+    state.json is committed back to the repo after every CI run, so a torn
+    write would poison every later run. We write to a sibling temp file and
+    os.replace() it over the target - on POSIX that is an atomic rename.
+    """
+    tmp = path.with_name(f".{path.name}.tmp")
+    tmp.write_text(json.dumps(data, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    os.replace(tmp, path)
 
 
 def new_entry() -> dict[str, Any]:
@@ -817,7 +825,6 @@ async def _maybe_alert_failures(product: dict[str, Any], entry: dict[str, Any],
         return False
     if entry.get("error_alerted"):
         return False
-    entry["error_alerted"] = True
     message = (
         f"Stock watcher: {failures} consecutive failed checks for "
         f"{product['name']} ({product['store']})\n"
@@ -826,6 +833,10 @@ async def _maybe_alert_failures(product: dict[str, Any], entry: dict[str, Any],
     log.warning("[%s] [%s] %s", product["store"], product["name"], message.splitlines()[0])
     sent = await ctx.notifier.send(message)
     if sent:
+        # Only mark alerted on success - if the notification failed to send,
+        # leave it unmarked so the next run retries instead of silently losing
+        # the alert forever.
+        entry["error_alerted"] = True
         entry["last_notified_at"] = utcnow().isoformat()
     return sent
 

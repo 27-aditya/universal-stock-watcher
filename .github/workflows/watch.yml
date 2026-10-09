@@ -65,7 +65,12 @@ jobs:
           NOTIFY_COOLDOWN_SECONDS: ${{ vars.NOTIFY_COOLDOWN_SECONDS || '1800' }}
           ALERT_AFTER_FAILURES: ${{ vars.ALERT_AFTER_FAILURES || '3' }}
           FETCH_RETRIES: ${{ vars.FETCH_RETRIES || '3' }}
+          FETCH_TIMEOUT: ${{ vars.FETCH_TIMEOUT || '20' }}
+          BROWSER_TIMEOUT_MS: ${{ vars.BROWSER_TIMEOUT_MS || '30000' }}
           REVALIDATE_EVERY: ${{ vars.REVALIDATE_EVERY || '20' }}
+          GLOBAL_CONCURRENCY: ${{ vars.GLOBAL_CONCURRENCY || '8' }}
+          DOMAIN_CONCURRENCY: ${{ vars.DOMAIN_CONCURRENCY || '2' }}
+          BROWSER_CONCURRENCY: ${{ vars.BROWSER_CONCURRENCY || '3' }}
 
       # Runs even if the watcher exited non-zero: a partial run still
       # produced state worth keeping, and failing here would hide the

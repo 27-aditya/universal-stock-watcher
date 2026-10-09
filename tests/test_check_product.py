@@ -415,6 +415,32 @@ async def test_alert_sent_once_per_failure_streak():
 
 
 @pytest.mark.asyncio
+async def test_alert_retried_when_telegram_send_fails():
+    """A failed notification must NOT swallow the alert permanently."""
+    notifier = FakeNotifier(fail=True)
+    config = watcher.Config(alert_after_failures=2, notify_cooldown_seconds=0)
+    ctx, state = make_ctx(config, notifier=notifier, http_client=_http_client(status=500))
+    state["p1"] = watcher.new_entry()
+
+    # threshold crossed but the send failed -> the alert stays pending
+    await watcher.check_product(make_product(), ctx)
+    await watcher.check_product(make_product(), ctx)
+    assert state["p1"]["consecutive_failures"] == 2
+    assert len(notifier.messages) == 1                    # attempted...
+    assert state["p1"]["error_alerted"] is False          # ...but not marked done
+
+    # the next failing run retries the alert; this time the send succeeds
+    notifier.fail = False
+    await watcher.check_product(make_product(), ctx)
+    assert state["p1"]["error_alerted"] is True
+    assert len(notifier.messages) == 2
+
+    # once delivered, further failures do not spam duplicates
+    await watcher.check_product(make_product(), ctx)
+    assert len(notifier.messages) == 2
+
+
+@pytest.mark.asyncio
 async def test_recovery_resets_failure_streak_and_allows_future_alert():
     notifier = FakeNotifier()
     config = watcher.Config(alert_after_failures=2, notify_cooldown_seconds=0)

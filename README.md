@@ -354,10 +354,15 @@ Run these commands:
 
 | Command                       | Purpose                                                  |
 | ----------------------------- | -------------------------------------------------------- |
-| `python -m pytest -q`         | Run the unit and integration tests. These tests use no network. |
+| `python -m pytest -q`         | Run the unit and integration tests. These tests use no network. The run also enforces the 90% coverage floor (`--cov-fail-under=90`). |
 | `python e2e_local.py`         | Run a true end-to-end test with a real HTTP server and the real CLI. |
 | `python -m ruff check .`      | Check the code style.                                    |
 
 The tests in `tests/` use mocked HTTP. The script `e2e_local.py` starts
 a local HTTP server and runs the real `watcher.py`. Both run offline and
 give the same result every time.
+
+GitHub Actions enforces all three checks. `.github/workflows/ci.yml` runs
+pytest (with the coverage gate), ruff, and the e2e suite on every push and
+pull request on Python 3.11, 3.12, and 3.13. `.github/workflows/watch.yml`
+is the scheduled stock check itself.
