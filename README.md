@@ -200,6 +200,7 @@ These are the fields for each product:
 | `name`        | The product name. Make it specific when the page has many variants. |
 | `description` | A description of the product. The LLM uses it to match the variant. |
 | `render`      | `http` or `browser`                                                 |
+| `pincode`     | Optional. A delivery pincode for stores that hide every product until a serviceable pincode is chosen (e.g. shop.amul.com, blinkit.com). Only affects `render: "browser"`: the watcher selects the pincode on the store's home page first, then opens the product page. |
 
 Rules for the `render` field:
 

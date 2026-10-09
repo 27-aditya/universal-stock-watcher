@@ -430,6 +430,7 @@ def load_products(path: Path) -> list[dict[str, Any]]:
             "url": url,
             "description": str(item.get("description") or ""),
             "render": render,
+            "pincode": str(item.get("pincode") or "").strip(),
         })
     return products
 
@@ -526,8 +527,57 @@ async def fetch_http(client: httpx.AsyncClient, url: str, *,
     raise FetchError(f"could not fetch {url} after {max(1, retries)} attempts: {last_error}")
 
 
+async def _set_delivery_pincode(page: Any, url: str, pincode: str) -> None:
+    """Best-effort: pre-select a delivery pincode for pincode-gated storefronts.
+
+    Some stores (e.g. shop.amul.com, blinkit.com) return a 404 page for every
+    product until a serviceable delivery pincode has been chosen.  Runs on the
+    store home page first, then the caller navigates to the product URL on the
+    same page so the SPA/localState keep the chosen pincode."""
+    base = f"{urlparse(url).scheme}://{urlparse(url).netloc}"
+    try:
+        await page.goto(base + "/", wait_until="domcontentloaded", timeout=30000)
+        try:
+            await page.wait_for_load_state("networkidle", timeout=8000)
+        except Exception:  # noqa: BLE001 - optional nicety, never fatal
+            pass
+        for label in (
+            "Select Delivery Pincode", "Select Pincodes", "Change Pincode",
+            "Enter Pincode", "Select Location",
+        ):
+            btn = page.get_by_text(label, exact=False).first
+            try:
+                await btn.click(timeout=4000)
+                break
+            except Exception:  # noqa: BLE001 - try the next label
+                continue
+        for selector in ("input[type=tel]", "input[maxlength='6']",
+                         "input[type=text]", "input"):
+            loc = page.locator(selector).first
+            try:
+                await loc.fill(pincode, timeout=3000)
+                break
+            except Exception:  # noqa: BLE001 - try the next selector
+                continue
+        try:
+            await page.keyboard.press("Enter")
+        except Exception:  # noqa: BLE001
+            pass
+        for label in ("Apply", "Submit", "Save", "OK"):
+            btn = page.get_by_role("button", name=label).first
+            try:
+                await btn.click(timeout=2500)
+                break
+            except Exception:  # noqa: BLE001 - try the next label
+                continue
+        await asyncio.sleep(1)
+    except Exception as exc:  # noqa: BLE001 - best effort only, never fatal
+        log.debug("pincode setup failed for %s: %s", url, exc)
+
+
 async def fetch_browser(browser: Any, url: str, limits: Limits, *,
-                        retries: int = 1, timeout_ms: int = 30000) -> str:
+                        retries: int = 1, timeout_ms: int = 30000,
+                        pincode: str | None = None) -> str:
     """Render the page with headless Chromium - needed for sites that fill
     in stock status via JavaScript after the initial page load.
 
@@ -541,6 +591,8 @@ async def fetch_browser(browser: Any, url: str, limits: Limits, *,
         async with limits.browser:
             page = await browser.new_page(user_agent=USER_AGENT)
             try:
+                if pincode:
+                    await _set_delivery_pincode(page, url, pincode)
                 await page.goto(url, wait_until="domcontentloaded", timeout=timeout_ms)
                 try:
                     await page.wait_for_load_state("networkidle", timeout=8000)
@@ -869,6 +921,7 @@ async def check_product(product: dict[str, Any], ctx: RunContext) -> ProductResu
                         ctx.browser, url, ctx.limits,
                         retries=ctx.config.fetch_retries,
                         timeout_ms=ctx.config.browser_timeout_ms,
+                        pincode=product.get("pincode") or None,
                     )
             else:
                 async with ctx.limits.domain(domain):

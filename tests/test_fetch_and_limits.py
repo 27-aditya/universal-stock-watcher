@@ -143,6 +143,57 @@ class FakePage:
         self.closed = True
 
 
+class PincodePage(FakePage):
+    def __init__(self, html="<html>rendered</html>"):
+        super().__init__(html=html)
+        self.filled = []
+        self.entered = False
+        self.clicked = []
+
+    def get_by_text(self, text, exact=False):
+        return _StubLocator(self.clicked, text)
+
+    def locator(self, selector):
+        return _StubLocator(self.filled, selector)
+
+    def get_by_role(self, role, name):
+        return _StubLocator(self.clicked, name)
+
+    @property
+    def keyboard(self):
+        return _StubKeyboard(self)
+
+
+class _StubKeyboard:
+    def __init__(self, owner):
+        self.owner = owner
+
+    async def press(self, key):
+        self.owner.pressed = getattr(self.owner, "pressed", [])
+        self.owner.pressed.append(key)
+
+
+class _StubLocator:
+    def __init__(self, log, label):
+        self._log = log
+        self._label = label
+        self._first = False
+
+    @property
+    def first(self):
+        self._first = True
+        return self
+
+    async def count(self):
+        return 1
+
+    async def click(self, timeout=None):
+        self._log.append(("click", self._label))
+
+    async def fill(self, value, timeout=None):
+        self._log.append(("fill", value))
+
+
 class FakeBrowser:
     def __init__(self, pages):
         self.pages = list(pages)
@@ -188,6 +239,60 @@ async def test_fetch_browser_raises_after_exhausting_retries():
 
     with pytest.raises(watcher.FetchError, match="after 2 attempts"):
         await watcher.fetch_browser(browser, "https://x.test/a", ctx.limits, retries=2)
+
+
+@pytest.mark.asyncio
+async def test_fetch_browser_sets_delivery_pincode_before_product():
+    page = PincodePage()
+    browser = FakeBrowser([page])
+    ctx, _ = make_ctx()
+
+    html = await watcher.fetch_browser(
+        browser, "https://shop.amul.com/en/product/amul", ctx.limits,
+        pincode="400001",
+    )
+
+    assert html == "<html>rendered</html>"
+    home, product = page.goto_calls
+    assert home[0] == "https://shop.amul.com/"
+    assert product[0] == "https://shop.amul.com/en/product/amul"
+    assert ("click", "Select Delivery Pincode") in page.clicked
+    assert ("fill", "400001") in page.filled
+    assert ("click", "Apply") in page.clicked
+
+
+@pytest.mark.asyncio
+async def test_fetch_browser_skips_pincode_when_none():
+    page = FakePage()
+    browser = FakeBrowser([page])
+    ctx, _ = make_ctx()
+
+    await watcher.fetch_browser(browser, "https://a.test/x", ctx.limits)
+
+    assert len(page.goto_calls) == 1
+    assert page.goto_calls[0][0] == "https://a.test/x"
+
+
+@pytest.mark.asyncio
+async def test_products_loader_reads_pincode():
+    import json
+    import tempfile
+    from pathlib import Path
+
+    with tempfile.NamedTemporaryFile(
+        "w", suffix=".json", delete=False
+    ) as fh:
+        json.dump([
+            {"id": "a", "name": "A", "url": "https://a.test/x",
+             "pincode": "400001"},
+        ], fh)
+        path = fh.name
+    try:
+        products = watcher.load_products(Path(path))
+        assert products[0]["pincode"] == "400001"
+    finally:
+        import os
+        os.unlink(path)
 
 
 @pytest.mark.asyncio
