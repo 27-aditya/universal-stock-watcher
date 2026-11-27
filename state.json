@@ -3,22 +3,22 @@
     "cached_selector": null,
     "consecutive_failures": 1,
     "error_alerted": false,
-    "last_checked": "2026-11-27T12:00:09.894501+00:00",
+    "last_checked": "2026-11-27T20:50:33.618185+00:00",
     "last_error": "llm: ConfigError: LLM_PROVIDER=anthropic but ANTHROPIC_API_KEY is not set",
     "last_llm_at": null,
     "last_notified_at": null,
     "last_status": "unknown",
-    "run_count": 235
+    "run_count": 236
   },
   "hotwheels_5pack_blinkit": {
     "cached_selector": null,
-    "consecutive_failures": 0,
+    "consecutive_failures": 1,
     "error_alerted": false,
-    "last_checked": "2026-11-27T11:59:48.955357+00:00",
-    "last_error": null,
+    "last_checked": "2026-11-27T20:50:19.533160+00:00",
+    "last_error": "llm: ConfigError: LLM_PROVIDER=anthropic but ANTHROPIC_API_KEY is not set",
     "last_llm_at": null,
     "last_notified_at": null,
     "last_status": "out_of_stock",
-    "run_count": 235
+    "run_count": 236
   }
 }
